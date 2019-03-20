@@ -1,11 +1,17 @@
 from __future__ import print_function
 
+import logging
+
 from django.db import connection
 from django.db.models.signals import post_migrate
+from django.db.utils import ProgrammingError
 
 from jsonfield_compat.fields import JSONField
-from jsonfield_compat.util import is_db_postgresql, use_native_jsonfield, \
-    django_supports_native_jsonfield
+from jsonfield_compat.util import (
+    is_db_postgresql,
+    use_native_jsonfield,
+    django_supports_native_jsonfield,
+)
 
 
 def convert_column_to_json(model, column_name):
@@ -18,21 +24,28 @@ def convert_column_to_json(model, column_name):
         cursor.execute(
             "select data_type from information_schema.columns "
             "where table_name = %s and column_name = %s;",
-            [table_name, column_name])
+            [table_name, column_name],
+        )
 
         current_type = cursor.fetchone()[0].upper()
         expected_type = 'JSONB' if use_native_jsonfield() else 'TEXT'
 
         if current_type != expected_type:
-            print("{app}: Converting {col} to use native {type} field".format(
-                app=model._meta.app_label, col=column_name, type=expected_type))
-
-            cursor.execute(
-                "ALTER TABLE {table} ALTER COLUMN {col} "
-                "TYPE {type} USING {col}::{type};".format(
-                    table=table_name, col=column_name, type=expected_type
+            print(
+                "{app}: Converting {col} to use native {type} field".format(
+                    app=model._meta.app_label, col=column_name, type=expected_type
                 )
             )
+
+            try:
+                cursor.execute(
+                    "ALTER TABLE {table} ALTER COLUMN {col} "
+                    "TYPE {type} USING {col}::{type};".format(
+                        table=table_name, col=column_name, type=expected_type
+                    )
+                )
+            except ProgrammingError as e:
+                logging.warning(f'Unable to alter database: {e}')
 
 
 def convert_model_json_fields(model):
