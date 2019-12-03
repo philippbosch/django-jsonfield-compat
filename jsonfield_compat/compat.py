@@ -9,7 +9,6 @@ except ImportError:  # pragma: no cover
     NativeJSONField = object
 
 from django.conf import settings
-from django.utils import six
 from django.utils.module_loading import import_string
 from psycopg2.extras import Json
 
@@ -17,7 +16,7 @@ from psycopg2.extras import Json
 def _get_jsonfield_encoder_class():
     encoder_class = getattr(settings, 'JSONFIELD_ENCODER_CLASS', None)
     if encoder_class:
-        if isinstance(encoder_class, six.string_types):
+        if isinstance(encoder_class, str):
             encoder_class = import_string(encoder_class)
 
         return encoder_class
